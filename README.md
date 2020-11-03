@@ -712,28 +712,28 @@ As you can see it has a single `mdat` atom/box, **this is place where the video 
 
 
 
-In this chapter, we're going to create a minimalist transcoder, written in C, that can convert videos coded in H264 to H265 using **FFmpeg/libav** library specifically [libavcodec](https://ffmpeg.org/libavcodec.html), libavformat, and libavutil.
+W tym rozdziale, zrobimy prosty transkoder, napisane w C,który będzie konwertował video zakodowane w H264 na H265 z użyciem biblioteki**FFMpeg/libav** a dokładniej:  [libavcodec](https://ffmpeg.org/libavcodec.html), libavformat, and libavutil.
 
 ![media transcoding flow](/img/transcoding_flow.png)
 
-> _Just a quick recap:_ The [**AVFormatContext**](https://www.ffmpeg.org/doxygen/trunk/structAVFormatContext.html) is the abstraction for the format of the media file, aka container (ex: MKV, MP4, Webm, TS). The [**AVStream**](https://www.ffmpeg.org/doxygen/trunk/structAVStream.html) represents each type of data for a given format (ex: audio, video, subtitle, metadata). The [**AVPacket**](https://www.ffmpeg.org/doxygen/trunk/structAVPacket.html) is a slice of compressed data obtained from the `AVStream` that can be decoded by an [**AVCodec**](https://www.ffmpeg.org/doxygen/trunk/structAVCodec.html) (ex: av1, h264, vp9, hevc) generating a raw data called [**AVFrame**](https://www.ffmpeg.org/doxygen/trunk/structAVFrame.html).
+> _Krótkie podsumowanie :_  [**AVFormatContext**](https://www.ffmpeg.org/doxygen/trunk/structAVFormatContext.html) jest abstrakcyjnym obiektem dla formatów plików medialnych aka ich formatów (ex MKV,MP$< Webm, TS).  [**AVStream**](https://www.ffmpeg.org/doxygen/trunk/structAVStream.html) reprezentuje każdy rodzaj danych dla danego formatu (np. audio,video, metadane, napisy). [**AVPacket**](https://www.ffmpeg.org/doxygen/trunk/structAVPacket.html) jest kawałkiem skompresowanych danych pochodzących z `AVStream` które mogą być zdekodowane przez [**AVCodec**](https://www.ffmpeg.org/doxygen/trunk/structAVCodec.html) (np: av1, h264, vp9, hevc) genereując surowe dane nazwane: [**AVFrame**](https://www.ffmpeg.org/doxygen/trunk/structAVFrame.html).
 
-### Transmuxing
+### Transmultipleksacja 
 
-Let's start with the simple transmuxing operation and then we can build upon this code, the first step is to **load the input file**.
+Zacznijmy więc od prostej operacji transmultipleksacji, i wtedy będziemy mogli oprzeć na tym kodzie pierwsze etam **wczytanie wejściowego pliku**.
 
 ```c
-// Allocate an AVFormatContext
+// Alokacja AVFormatContext
 avfc = avformat_alloc_context();
-// Open an input stream and read the header.
+// Otworzenie wejściowego strumienia pliku i odczytanie nagłówka
 avformat_open_input(avfc, in_filename, NULL, NULL);
-// Read packets of a media file to get stream information.
+// Odczytanie pakietów pliku by uzyskać inforamcje o strumieniu
 avformat_find_stream_info(avfc, NULL);
 ```
 
-Now we're going to set up the decoder, the `AVFormatContext` will give us access to all the `AVStream` components and for each one of them, we can get their `AVCodec` and create the particular `AVCodecContext` and finally we can open the given codec so we can proceed to the decoding process.
+Teraz przygotujemy dekoder, `AVFormatContext` umożliwi nam dostęp do wszystkich `AVStream` komponentu i dla każdego z osobna możemy uzyskać ich `AVCodec` i stworzyć poszczególne `AVCodecContext` i wkońcu możemy otworzyć dostarczony dany kodek więc możemy przystąpić do procesu dekodowania.
 
->  The [**AVCodecContext**](https://www.ffmpeg.org/doxygen/trunk/structAVCodecContext.html) holds data about media configuration such as bit rate, frame rate, sample rate, channels, height, and many others.
+>  [**AVCodecContext**](https://www.ffmpeg.org/doxygen/trunk/structAVCodecContext.html) przetrzymuje dane mówiące o ustawieniach konfiguracji danego nośnika takich jak przepływność bitowa, ilość klatek na sekunde (FPS), częstotliwość próbkowania,kanały, wysokość i wiele innych.
 
 ```c
 for (int i = 0; i < avfc->nb_streams; i++)
@@ -746,9 +746,9 @@ for (int i = 0; i < avfc->nb_streams; i++)
 }
 ```
 
-We need to prepare the output media file for transmuxing as well, we first **allocate memory** for the output `AVFormatContext`. We create **each stream** in the output format. In order to pack the stream properly, we **copy the codec parameters** from the decoder.
+Potrzebujemy przygotować wyjściowy plik dla transmultipleksacji jak również **zaalokować pamięć** dla wyjściowego  `AVFormatContext`. Utworzymy **każdy z osobna strumień** dla wyjściowego formatu.  Ay prawidłowo 'spakować' strumienie **kopiujemy parametry kodeka** z dekodera.
 
-We **set the flag** `AV_CODEC_FLAG_GLOBAL_HEADER` which tells the encoder that it can use the global headers and finally we open the output **file for write** and persist the headers.
+ **Ustawiamy flagę** `AV_CODEC_FLAG_GLOBAL_HEADER` która mówi enkoderowi że ma użyć globalnych nagłówków, oraz w końcu otwieramy wyjściowy **plik do zapisu** i zapisujemy nagłówki.
 
 ```c
 avformat_alloc_output_context2(&encoder_avfc, NULL, NULL, out_filename);
@@ -763,8 +763,7 @@ avio_open(&encoder_avfc->pb, encoder->filename, AVIO_FLAG_WRITE);
 avformat_write_header(encoder->avfc, &muxer_opts);
 
 ```
-
-We're getting the `AVPacket`'s from the decoder, adjusting the timestamps, and write the packet properly to the output file. Even though the function `av_interleaved_write_frame` says "write frame" we are storing the packet. We finish the transmuxing process by writing the stream trailer to the file.
+Otrzymujemy 'AVPacket''y z dekodera, regulujemy  pola znaczników czasu i zapisujemy pakiet odpowiednio do wyjściowego pliku (`av_interleaved_write_frame`). Nawet jeśli funkcja `av_interleaved_write_frame`  zawiera "write frame" w rzezywistości przechowujemy cały pakiet. Proces tansmultipleksacji kończymy zapisując strumień-trailer do pliku.
 
 ```c
 AVFrame *input_frame = av_frame_alloc();
