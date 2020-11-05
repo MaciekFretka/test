@@ -778,17 +778,17 @@ while (av_read_frame(decoder_avfc, input_packet) >= 0)
 av_write_trailer(encoder_avfc);
 ```
 
-### Transcoding
+### Transkodowanie
 
-The previous section showed a simple transmuxer program, now we're going to add the capability to encode files, specifically we're going to enable it to transcode videos from `h264` to `h265`.
+Poprzedni rozdział prezentował  prosty program trunsmuklipleksera.Teraz dodamy do niego funkcjonalność enkodowania plików,konkretnie zamierzamy przekodować wideo z 'h.264' do 'h.265'.
 
-After we prepared the decoder but before we arrange the output media file we're going to set up the encoder.
+Wcześniej przygotowaliśmy dekoder, ale zanim zadoptujemy wyjściowy plik, skonfigurujemy enkoder.
 
-* Create the video `AVStream` in the encoder, [`avformat_new_stream`](https://www.ffmpeg.org/doxygen/trunk/group__lavf__core.html#gadcb0fd3e507d9b58fe78f61f8ad39827)
-* Use the `AVCodec` called `libx265`, [`avcodec_find_encoder_by_name`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__encoding.html#gaa614ffc38511c104bdff4a3afa086d37)
-* Create the `AVCodecContext` based in the created codec, [`avcodec_alloc_context3`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__core.html#gae80afec6f26df6607eaacf39b561c315)
-* Set up basic attributes for the transcoding session, and
-* Open the codec and copy parameters from the context to the stream. [`avcodec_open2`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga11f785a188d7d9df71621001465b0f1d) and [`avcodec_parameters_from_context`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga0c7058f764778615e7978a1821ab3cfe)
+* Tworzymy 'AVStream' z wideo w enkoderze [`avformat_new_stream`](https://www.ffmpeg.org/doxygen/trunk/group__lavf__core.html#gadcb0fd3e507d9b58fe78f61f8ad39827)
+* Używamy`AVCodec` 'a nazwanego' `libx265`, [`avcodec_find_encoder_by_name`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__encoding.html#gaa614ffc38511c104bdff4a3afa086d37)
+*Tworzymy `AVCodecContext` na podstawie utworzonego kodeka, [`avcodec_alloc_context3`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__core.html#gae80afec6f26df6607eaacf39b561c315)
+* Konfigurujemy podstawowe parametry dla transkodującej sesji i 
+* Otwieramy kodek oraz kopiujemy parametry z 'context' do strumienia. [`avcodec_open2`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga11f785a188d7d9df71621001465b0f1d) i [`avcodec_parameters_from_context`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga0c7058f764778615e7978a1821ab3cfe)
 
 ```c
 AVRational input_framerate = av_guess_frame_rate(decoder_avfc, decoder_video_avs, NULL);
@@ -803,12 +803,12 @@ char *codec_priv_value = "keyint=60:min-keyint=60:scenecut=0";
 
 AVCodec *video_avc = avcodec_find_encoder_by_name(codec_name);
 AVCodecContext *video_avcc = avcodec_alloc_context3(video_avc);
-// encoder codec params
+// parametry enkodowania kodeka
 av_opt_set(sc->video_avcc->priv_data, codec_priv_key, codec_priv_value, 0);
 video_avcc->height = decoder_ctx->height;
 video_avcc->width = decoder_ctx->width;
 video_avcc->pix_fmt = video_avc->pix_fmts[0];
-// control rate
+// Kontrola przepływności
 video_avcc->bit_rate = 2 * 1000 * 1000;
 video_avcc->rc_buffer_size = 4 * 1000 * 1000;
 video_avcc->rc_max_rate = 2 * 1000 * 1000;
@@ -820,16 +820,15 @@ video_avs->time_base = sc->video_avcc->time_base;
 avcodec_open2(sc->video_avcc, sc->video_avc, NULL);
 avcodec_parameters_from_context(sc->video_avs->codecpar, sc->video_avcc);
 ```
+Należy rozbudować pętle dekodującą dla transkodowania strumieni wideo
 
-We need to expand our decoding loop for the video stream transcoding:
-
-* Send the empty `AVPacket` to the decoder, [`avcodec_send_packet`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga58bc4bf1e0ac59e27362597e467efff3)
-* Receive the uncompressed `AVFrame`, [`avcodec_receive_frame`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga11e6542c4e66d3028668788a1a74217c)
-* Start to transcode this raw frame,
-* Send the raw frame, [`avcodec_send_frame`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga9395cb802a5febf1f00df31497779169)
-* Receive the compressed, based on our codec, `AVPacket`, [`avcodec_receive_packet`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga5b8eff59cf259747cf0b31563e38ded6)
-* Set up the timestamp, and [`av_packet_rescale_ts`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__packet.html#gae5c86e4d93f6e7aa62ef2c60763ea67e)
-* Write it to the output file. [`av_interleaved_write_frame`](https://www.ffmpeg.org/doxygen/trunk/group__lavf__encoding.html#ga37352ed2c63493c38219d935e71db6c1)
+* Dostarczenie pustego `AVPacket` do dekodera [`avcodec_send_packet`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga58bc4bf1e0ac59e27362597e467efff3)
+* Otrzymanie nieskompresowanej `AVFrame`, [`avcodec_receive_frame`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga11e6542c4e66d3028668788a1a74217c)
+* Rozpoczęcie transkodowania tej 'surowej' ramki. 
+* Wysłanie surowej ramki [`avcodec_send_frame`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga9395cb802a5febf1f00df31497779169)
+* Otrzymanie skompresowanej za pomocą kodeka, ramki `AVPacket`, [`avcodec_receive_packet`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga5b8eff59cf259747cf0b31563e38ded6)
+* Konfiguracja sygnaturczy czasowej oraz [`av_packet_rescale_ts`](https://www.ffmpeg.org/doxygen/trunk/group__lavc__packet.html#gae5c86e4d93f6e7aa62ef2c60763ea67e)
+*Zapis do wyjściowego pliku [`av_interleaved_write_frame`](https://www.ffmpeg.org/doxygen/trunk/group__lavf__encoding.html#ga37352ed2c63493c38219d935e71db6c1)
 
 ```c
 AVFrame *input_frame = av_frame_alloc();
@@ -854,7 +853,7 @@ while (av_read_frame(decoder_avfc, input_packet) >= 0)
 }
 av_write_trailer(encoder_avfc);
 
-// used function
+// używana funkcja
 int encode(AVFormatContext *avfc, AVStream *dec_video_avs, AVStream *enc_video_avs, AVCodecContext video_avcc int index) {
   AVPacket *output_packet = av_packet_alloc();
   int response = avcodec_send_frame(video_avcc, input_frame);
@@ -879,8 +878,7 @@ int encode(AVFormatContext *avfc, AVStream *dec_video_avs, AVStream *enc_video_a
 }
 
 ```
-
-We converted the media stream from `h264` to `h265`, as expected the `h265` version of the media file is smaller than the `h264` however the [created program](/3_transcoding.c) is capable of:
+Przekonwertowaliśmy plik z 'h264' do 'h265', zgodnie z oczekiwaniami plik w wersji 'h265' jest mniejszy od 'h264' jednakże [utworzony program](/3_transcoding.c) ma możliwości:
 
 ```c
 
@@ -950,4 +948,4 @@ We converted the media stream from `h264` to `h265`, as expected the `h265` vers
 
 ```
 
-> Now, to be honest, this was [harder than I thought](https://github.com/leandromoreira/ffmpeg-libav-tutorial/pull/54) it'd be and I had to dig into the [FFmpeg command line source code](https://github.com/leandromoreira/ffmpeg-libav-tutorial/pull/54#issuecomment-570746749) and test it a lot and I think I'm missing something because I had to enforce `force-cfr` for the `h264` to work and I'm still seeing some warning messages like `warning messages (forced frame type (5) at 80 was changed to frame type (3))`.
+> Trzeba przyznać to było, [trudniejsze niż się spodziewano](https://github.com/leandromoreira/ffmpeg-libav-tutorial/pull/54) i potrzebowałem zaglądnięcia do [kodu komend konsolowych FFmpeg'a](https://github.com/leandromoreira/ffmpeg-libav-tutorial/pull/54#issuecomment-570746749) i testować dużo.Myślę że coś pominąłem ponieważ musiałem używać na siłę `force-cfr`do `h264`by zadziałało oraz wciąż widać pewne 'warningi' jak: `warning messages (forced frame type (5) at 80 was changed to frame type (3))`.
